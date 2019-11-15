@@ -333,9 +333,9 @@ public:
       for (int k = 0; k < level; k++) {
         std::cout << "    ";
       }
-      std::cout << (char)ptr.data[i] << ptr.page_id;
-      if (ptr.next) std::cout << "^" << ptr.next;
-      std::cout << std::endl;
+
+      if (ptr.data[i]!=0) std::cout << (T)ptr.data[i] << std::endl;
+      else std::cout << ptr.keys[i] << std::endl;
     }
     if (ptr.children[i + 1]) {
       node child = read_node(ptr.children[i + 1]);

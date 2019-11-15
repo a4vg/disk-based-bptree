@@ -12,6 +12,7 @@ public:
     long page_id{-1};
     long count{0};
     
+    long keys[BTREE_ORDER + 1];
     T data[BTREE_ORDER + 1];
     long children[BTREE_ORDER + 2];
 
@@ -19,17 +20,21 @@ public:
       count = 0;
       for (int i = 0; i < BTREE_ORDER + 2; i++) {
         children[i] = 0;
+        keys[i] = 0;
       }
     }
 
-    void insert_in_node(int pos, const T &value) {
+    void insert_in_node(int pos, const T &value, long key, bool isLeaf=false) {
       int j = count;
       while (j > pos) {
         data[j] = data[j - 1];
+        keys[j] = keys[j - 1];
         children[j + 1] = children[j];
         j--;
       }
-      data[j] = value;
+      keys[j] = key;
+      if (isLeaf) data[j] = value; // store data only if is leaf
+      
       children[j + 1] = children[j];
 
       count++;
@@ -78,29 +83,29 @@ public:
 
   bool write_node(long page_id, node n) { pm->save(page_id, n); }
 
-  void insert(const T &value) {
+  void insert(const T &value, long key) {
     node root = read_node(header.root_id);
-    int state = insert(root, value);
+    int state = insert(root, value, key);
 
     if (state == BT_OVERFLOW) {
       split_root();
     }
   }
 
-  int insert(node &ptr, const T &value) {
+  int insert(node &ptr, const T &value, long key) {
     int pos = 0;
-    while (pos < ptr.count && ptr.data[pos] < value) {
+    while (pos < ptr.count && ptr.keys[pos] < value) {
       pos++;
     }
     if (ptr.children[pos] != 0) {
       long page_id = ptr.children[pos];
       node child = read_node(page_id);
-      int state = insert(child, value);
+      int state = insert(child, value, key);
       if (state == BT_OVERFLOW) {
         split(ptr, pos);
       }
-    } else {
-      ptr.insert_in_node(pos, value);
+    } else { // is leaf
+      ptr.insert_in_node(pos, value, key, ptr.children[pos] == 0);
       write_node(ptr.page_id, ptr);
     }
     return ptr.is_overflow() ? BT_OVERFLOW : NORMAL;
@@ -115,19 +120,21 @@ public:
     int i;
     for (i = 0; iter < BTREE_ORDER / 2; i++) {
       left.children[i] = ptr.children[iter];
-      left.data[i] = ptr.data[iter];
+      left.keys[i] = ptr.keys[iter];
+      if (ptr.children[0]==0) std::swap(left.data[i], ptr.data[iter]); // ptr is leaf
       left.count++;
       iter++;
     }
     left.children[i] = ptr.children[iter];
 
-    parent.insert_in_node(pos, ptr.data[iter]);
-
-    iter++; // the middle element
+    parent.insert_in_node(pos, ptr.data[iter], ptr.keys[iter]); // will only insert key
+                                                                // (parent will never be a leaf)
+    if (ptr.children[0]!=0) iter++; // skip middle element only if intermediate node
 
     for (i = 0; iter < BTREE_ORDER + 1; i++) {
       right.children[i] = ptr.children[iter];
-      right.data[i] = ptr.data[iter];
+      right.keys[i] = ptr.keys[iter];
+      if (ptr.children[0]==0) std::swap(right.data[i], ptr.data[iter]); // ptr is leaf
       right.count++;
 
       iter++;
@@ -152,22 +159,26 @@ public:
     int i;
     for (i = 0; iter < BTREE_ORDER / 2; i++) {
       left.children[i] = ptr.children[iter];
-      left.data[i] = ptr.data[iter];
+      if (ptr.children[0]==0) std::swap(left.data[i], ptr.data[iter]); // ptr (root) is leaf
+      left.keys[i] = ptr.keys[iter];
       left.count++;
       iter++;
     }
     left.children[i] = ptr.children[iter];
-    iter++; // the middle element
+
+    if (ptr.children[0]!=0) iter++; // skip middle element only if intermediate node
+
     for (i = 0; iter < BTREE_ORDER + 1; i++) {
       right.children[i] = ptr.children[iter];
-      right.data[i] = ptr.data[iter];
+      if (ptr.children[0]==0) std::swap(right.data[i], ptr.data[iter]); // ptr (root) is leaf
+      right.keys[i] = ptr.keys[iter];
       right.count++;
       iter++;
     }
     right.children[i] = ptr.children[iter];
 
     ptr.children[pos] = left.page_id;
-    ptr.data[0] = ptr.data[BTREE_ORDER / 2];
+    ptr.keys[0] = ptr.keys[BTREE_ORDER / 2]; // store key, not data
     ptr.children[pos + 1] = right.page_id;
     ptr.count = 1;
 
@@ -195,7 +206,7 @@ public:
       for (int k = 0; k < level; k++) {
         std::cout << "    ";
       }
-      std::cout << ptr.data[i] << "\n";
+      std::cout << (char)ptr.data[i] << ptr.keys[i] << "\n";
     }
     if (ptr.children[i + 1]) {
       node child = read_node(ptr.children[i + 1]);

@@ -282,6 +282,14 @@ public:
     return iterator(pm, 0, 0);
   }
 
+  iterator begin(){
+    node ptr = read_node(header.root_id);
+
+    // go down left
+    while (ptr.children[0]!=0) ptr = read_node(ptr.children[0]);
+    return iterator(pm, ptr.page_id, ptr.count);
+  }
+
   std::pair<bool, iterator> find(const T &key) {
     node root = read_node(header.root_id);
     return find(root, key);

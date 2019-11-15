@@ -126,28 +126,28 @@ TEST_F(DiskBasedBtree, Persistence) {
 }
 
 
-// TEST_F(DiskBasedBtree, Iterators) {
-//   bool trunc_file = true;
-//   std::shared_ptr<pagemanager> pm = std::make_shared<pagemanager>("btree.index", PAGE_SIZE, trunc_file);
-//   btree<int, BTREE_ORDER> bt(pm);
+TEST_F(DiskBasedBtree, Iterators) {
+  bool trunc_file = true;
+  std::shared_ptr<pagemanager> pm = std::make_shared<pagemanager>("btree.index", PAGE_SIZE, trunc_file);
+  btree<int, BTREE_ORDER> bt(pm);
 
-//   std::ifstream testFile("1M_numbers.txt");
-//   std::string all_letters = "";
+  std::ifstream testFile("1M_numbers.txt");
+  std::string all_letters = "";
 
-//   int number;
-//   while (testFile >> number){
-//     bt.insert(number, (int)number);
-    // all_letters+=std::to_string(number);
-  // }
+  int number;
+  while (testFile >> number){
+    bt.insert(number, (int)number);
+    all_letters+=std::to_string(number);
+  }
 
-  // std::ostringstream out;
-  // btree<int, BTREE_ORDER>::iterator iter = bt.begin();
-  // for( ; iter != bt.end(); iter++) {
-  //     out << *iter;
-  // }
-  // // std::sort(all_letters.begin(), all_letters.end());
-  // EXPECT_EQ(out.str(), all_letters);
-// }
+  std::ostringstream out;
+  btree<int, BTREE_ORDER>::iterator iter = bt.begin();
+  for( ; iter != bt.end(); iter++) {
+      out << *iter;
+  }
+  std::sort(all_letters.begin(), all_letters.end());
+  EXPECT_EQ(out.str(), all_letters);
+}
 
 
 TEST_F(DiskBasedBtree, Dictionary) {

@@ -81,7 +81,7 @@ void select(){
 
   std::shared_ptr<pagemanager> pm = std::make_shared<pagemanager>("btree.index", page_size);
   btree< long, btree_order> bt(pm);
-  auto iter = bt.range_search(3, 30);
+  auto iter = bt.range_search(3, 100);
   for (; iter != bt.end(); iter++) {
     Student s;
     record_manager.recover(*iter, s);
@@ -127,21 +127,24 @@ TEST_F(DiskBasedBtree, Persistence) {
 
 
 TEST_F(DiskBasedBtree, Iterators) {
+  const int page_size = 1024;
+  const int btree_order = 82;
+  
   bool trunc_file = true;
-  std::shared_ptr<pagemanager> pm = std::make_shared<pagemanager>("btree.index", PAGE_SIZE, trunc_file);
-  btree<int, BTREE_ORDER> bt(pm);
+  std::shared_ptr<pagemanager> pm = std::make_shared<pagemanager>("btree.index", page_size, trunc_file);
+  btree<int, btree_order> bt(pm);
 
   std::ifstream testFile("1M_numbers.txt");
   std::string all_letters = "";
 
   int number;
   while (testFile >> number){
-    bt.insert(number, (int)number);
+    bt.insert(number, number);
     all_letters+=std::to_string(number);
   }
 
   std::ostringstream out;
-  btree<int, BTREE_ORDER>::iterator iter = bt.begin();
+  btree<int, btree_order>::iterator iter = bt.find(0).second;
   for( ; iter != bt.end(); iter++) {
       out << *iter;
   }

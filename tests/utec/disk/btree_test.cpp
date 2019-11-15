@@ -40,4 +40,23 @@ TEST_F(DiskBasedBtree, TestA) {
     }
     bt.print();
 }
+
+TEST_F(DiskBasedBtree, TestB) {
+    std::shared_ptr<pagemanager> pm = std::make_shared<pagemanager>("btree.index", PAGE_SIZE);
+    std::cout << "PAGE_SIZE: " << PAGE_SIZE << std::endl;
+    std::cout << "BTREE_ORDER: " << BTREE_ORDER << std::endl;
+    btree<char, BTREE_ORDER> bt(pm);
+    std::string values = "iwrvjsbptcgzqknleoyuxfadmh";
+    for(auto c : values) {
+       bt.insert(c, (int)c);
+       bt.print();
+    }
+    bt.print();
+
+    btree<char, BTREE_ORDER>::iterator it = bt.find('a');
+    for (int i=0; it!=bt.end(); it++, ++i){
+        std::cout << i << "-" << *it << " ";
+    }
+    std::cout << std::endl;
+}
  

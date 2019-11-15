@@ -2,13 +2,13 @@
 
 #include "pagemanager.h"
 #include <memory>
+#include <stdexcept>
 
 namespace utec {
 namespace disk {
 
-template <class T, int BTREE_ORDER = 3> class btree {
-public:
-  struct node {
+template <class T, int BTREE_ORDER = 3>
+struct Node {
     long page_id{-1};
     long count{0};
     
@@ -17,7 +17,7 @@ public:
     long children[BTREE_ORDER + 2];
     long next{0};
 
-    node(long page_id) : page_id{page_id} {
+    Node(long page_id) : page_id{page_id} {
       count = 0;
       for (int i = 0; i < BTREE_ORDER + 2; i++) {
         children[i] = 0;
@@ -42,8 +42,56 @@ public:
     }
 
     bool is_overflow() { return count > BTREE_ORDER; }
-  };
+};
 
+template <class T, int BTREE_ORDER = 3>
+struct Iterator{
+  typedef Node<T, BTREE_ORDER> node;
+
+  long begin[2]; // page pos
+  long end[2];
+  std::shared_ptr<pagemanager> pm;
+
+  Iterator(std::shared_ptr<pagemanager> pm, long begin_page, int begin_pos, long end_page=-1, int end_pos=0)
+  : pm{pm}{
+    begin[0] = begin_page;
+    begin[1] = begin_pos;
+    end[0] = end_page;
+    end[1] = end_pos;
+  }
+
+  Iterator operator++(int){
+    Iterator old(pm, begin[0], begin[1]);
+    node n{-1};
+    pm->recover(begin[0], n);
+
+    if (begin[1] < n.count-1) ++begin[1];
+    else{
+      begin[0] = n.next;
+      begin[1] = 0;
+    }
+
+    return old;
+  }
+
+  bool operator!=(const Iterator &other) const{
+    return begin[0] != other.begin[0] || begin[1] != other.begin[1];
+  }
+
+  const T &operator*() const{
+    if (begin[0]==0 || (begin[0]==end[0] && begin[1]==end[1]))
+      throw std::out_of_range("Iterator reached end");
+
+    node n{-1};
+    pm->recover(begin[0], n);
+    return n.data[begin[1]];
+  }
+};
+
+template <class T, int BTREE_ORDER = 3> class btree {
+public:
+  typedef Node<T, BTREE_ORDER> node;
+  typedef Iterator<T, BTREE_ORDER> iterator;
   struct Metadata {
     long root_id{1};
     long count{0};
@@ -155,14 +203,11 @@ public:
         if (grandpa_id!=0){
           node grandpa = this->read_node(grandpa_id);
           int parentPos = 0;
-          std::cout << "Grandpa: " << grandpa_id << "\n";
-          std::cout << "Parent: " << parent.page_id << "\n";
 
           for (; grandpa.children[parentPos]!=parent.page_id; ++parentPos);
 
           if (parentPos!=0){
-            std::cout << "prevParent: " << --parentPos << "\n";
-            node prevParent = this->read_node(grandpa.children[parentPos]);
+            node prevParent = this->read_node(grandpa.children[--parentPos]);
             int posPrev=0;
             for (; prevParent.children[posPrev]!=0; ++posPrev);
             node prevChild = this->read_node(prevParent.children[--posPrev]);
@@ -227,7 +272,32 @@ public:
     write_node(right.page_id, right);
   }
 
-  bool find(const T &value) { return false; }
+  iterator end(){
+    return iterator(pm, 0, 0);
+  }
+
+  iterator find(const T &key) {
+    node root = read_node(header.root_id);
+    return find(root, key);
+  }
+
+  iterator find(node &ptr, long key) {
+    int pos = 0;
+    while (pos < ptr.count && ptr.keys[pos] < key) {
+      pos++;
+    }
+
+    if (ptr.children[pos] != 0) {
+      long page_id = ptr.children[pos];
+      node child = read_node(page_id);
+      return find(child, key);
+    } else { // is leaf
+      int i=0;
+      for (; i<ptr.count && ptr.keys[i]!=key; ++i);
+      
+      return ptr.keys[i]!=key? end() : iterator(pm, ptr.page_id, i);
+    }
+  }
 
   void print() {
     node root = read_node(header.root_id);

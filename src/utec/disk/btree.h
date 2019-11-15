@@ -3,6 +3,7 @@
 #include "pagemanager.h"
 #include <memory>
 #include <stdexcept>
+#include <utility>
 
 namespace utec {
 namespace disk {
@@ -49,15 +50,13 @@ struct Iterator{
   typedef Node<T, BTREE_ORDER> node;
 
   long begin[2]; // page pos
-  long end[2];
+  long end[2] = {-1, 0};
   std::shared_ptr<pagemanager> pm;
 
-  Iterator(std::shared_ptr<pagemanager> pm, long begin_page, int begin_pos, long end_page=-1, int end_pos=0)
+  Iterator(std::shared_ptr<pagemanager> pm, long begin_page, int begin_pos)
   : pm{pm}{
     begin[0] = begin_page;
     begin[1] = begin_pos;
-    end[0] = end_page;
-    end[1] = end_pos;
   }
 
   Iterator operator++(int){
@@ -85,6 +84,10 @@ struct Iterator{
     node n{-1};
     pm->recover(begin[0], n);
     return n.data[begin[1]];
+  }
+
+  Iterator limit(){
+    return Iterator(pm, end[0], end[1]);
   }
 };
 
@@ -276,12 +279,12 @@ public:
     return iterator(pm, 0, 0);
   }
 
-  iterator find(const T &key) {
+  std::pair<bool, iterator> find(const T &key) {
     node root = read_node(header.root_id);
     return find(root, key);
   }
 
-  iterator find(node &ptr, long key) {
+  std::pair<bool, iterator> find(node &ptr, long key) {
     int pos = 0;
     while (pos < ptr.count && ptr.keys[pos] < key) {
       pos++;
@@ -293,10 +296,24 @@ public:
       return find(child, key);
     } else { // is leaf
       int i=0;
-      for (; i<ptr.count && ptr.keys[i]!=key; ++i);
-      
-      return ptr.keys[i]!=key? end() : iterator(pm, ptr.page_id, i);
+      for (; i<ptr.count-1 && ptr.keys[i]<key; ++i);
+
+      int page = ptr.page_id;
+      if (ptr.keys[i]!=key) page = ptr.next;
+
+      return std::make_pair(ptr.keys[i]==key, iterator(pm, page, i));
     }
+  }
+
+  iterator range_search(const T &begin, const T &end){
+    node root = read_node(header.root_id);
+    iterator it = find(root, begin).second;
+    iterator it_end = find(root, end).second;
+
+    it.end[0] = it_end.begin[0];
+    it.end[1] = it_end.begin[1];
+
+    return it;
   }
 
   void print() {

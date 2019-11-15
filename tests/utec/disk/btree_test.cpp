@@ -43,18 +43,34 @@ TEST_F(DiskBasedBtree, TestA) {
 
 TEST_F(DiskBasedBtree, TestB) {
     std::shared_ptr<pagemanager> pm = std::make_shared<pagemanager>("btree.index", PAGE_SIZE);
-    std::cout << "PAGE_SIZE: " << PAGE_SIZE << std::endl;
-    std::cout << "BTREE_ORDER: " << BTREE_ORDER << std::endl;
     btree<char, BTREE_ORDER> bt(pm);
-    std::string values = "iwrvjsbptcgzqknleoyuxfadmh";
+    std::string values = "iwrvjsptcgzqknleoyuxfadmh";
     for(auto c : values) {
        bt.insert(c, (int)c);
-       bt.print();
     }
-    bt.print();
 
-    btree<char, BTREE_ORDER>::iterator it = bt.find('a');
+    auto pair_find = bt.find('b');
+    bool found = pair_find.first;
+    btree<char, BTREE_ORDER>::iterator it = pair_find.second;
+
+    std::cout << "Found 'b'?: " << found << std::endl;
     for (int i=0; it!=bt.end(); it++, ++i){
+        std::cout << i << "-" << *it << " ";
+    }
+    std::cout << std::endl;
+}
+
+TEST_F(DiskBasedBtree, TestC) {
+    std::shared_ptr<pagemanager> pm = std::make_shared<pagemanager>("btree.index", PAGE_SIZE);
+    btree<char, BTREE_ORDER> bt(pm);
+    std::string values = "zxcnmvafjdaqpirue";
+    for(auto c : values) {
+       bt.insert(c, (int)c);
+    }
+
+    std::cout << "From 'd' to 's'" << std::endl;
+    btree<char, BTREE_ORDER>::iterator it = bt.range_search('d', 's');
+    for (int i=0; it!=it.limit(); it++, ++i){
         std::cout << i << "-" << *it << " ";
     }
     std::cout << std::endl;

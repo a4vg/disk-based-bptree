@@ -22,7 +22,7 @@ struct Node {
       count = 0;
       for (int i = 0; i < BTREE_ORDER + 2; i++) {
         children[i] = 0;
-        keys[i] = 0;
+        keys[i] = -1;
       }
     }
 
@@ -316,7 +316,7 @@ public:
     return it;
   }
 
-  void print() {
+  void print_tree() {
     node root = read_node(header.root_id);
     print(root, 0);
     std::cout << "________________________\n";
@@ -334,13 +334,27 @@ public:
         std::cout << "    ";
       }
 
-      if (ptr.data[i]!=0) std::cout << (T)ptr.data[i] << std::endl;
+      if (ptr.data[i]!=-1) std::cout << (T)ptr.data[i] << std::endl;
       else std::cout << ptr.keys[i] << std::endl;
     }
     if (ptr.children[i + 1]) {
       node child = read_node(ptr.children[i + 1]);
       print(child, level + 1);
     }
+  }
+
+  void print(std::ostringstream &out){
+    node ptr = read_node(header.root_id);
+
+    // go down left
+    while (ptr.children[0]!=0) ptr = read_node(ptr.children[0]);
+
+    // go throgh linked leaf nodes
+    while (ptr.next != 0){
+      for (int i=0; i<ptr.count; ++i) out << ptr.data[i];
+      ptr = read_node(ptr.next);
+    }
+    for (int i=0; i<ptr.count; ++i) out << ptr.data[i];
   }
 };
 

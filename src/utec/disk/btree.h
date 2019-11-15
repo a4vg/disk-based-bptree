@@ -15,6 +15,7 @@ public:
     long keys[BTREE_ORDER + 1];
     T data[BTREE_ORDER + 1];
     long children[BTREE_ORDER + 2];
+    long next{0};
 
     node(long page_id) : page_id{page_id} {
       count = 0;
@@ -92,7 +93,7 @@ public:
     }
   }
 
-  int insert(node &ptr, const T &value, long key) {
+  int insert(node &ptr, const T &value, long key, long grandpa_id=0) {
     int pos = 0;
     while (pos < ptr.count && ptr.keys[pos] < value) {
       pos++;
@@ -100,9 +101,9 @@ public:
     if (ptr.children[pos] != 0) {
       long page_id = ptr.children[pos];
       node child = read_node(page_id);
-      int state = insert(child, value, key);
+      int state = insert(child, value, key, ptr.page_id);
       if (state == BT_OVERFLOW) {
-        split(ptr, pos);
+        split(ptr, pos, grandpa_id);
       }
     } else { // is leaf
       ptr.insert_in_node(pos, value, key, ptr.children[pos] == 0);
@@ -111,7 +112,7 @@ public:
     return ptr.is_overflow() ? BT_OVERFLOW : NORMAL;
   }
 
-  void split(node &parent, int pos) {
+  void split(node &parent, int pos, long grandpa_id=0) {
     node ptr = this->read_node(parent.children[pos]);
     node left = this->new_node();
     node right = this->new_node();
@@ -143,6 +144,39 @@ public:
 
     parent.children[pos] = left.page_id;
     parent.children[pos + 1] = right.page_id;
+
+    // TODO: Clean code
+    parent.next = 0;
+    if (ptr.children[0]==0){ // link nodes if leaf
+      left.next = right.page_id;
+      right.next = ptr.next;
+
+      if (pos-1<0){ // prev node has different parent
+        if (grandpa_id!=0){
+          node grandpa = this->read_node(grandpa_id);
+          int parentPos = 0;
+          std::cout << "Grandpa: " << grandpa_id << "\n";
+          std::cout << "Parent: " << parent.page_id << "\n";
+
+          for (; grandpa.children[parentPos]!=parent.page_id; ++parentPos);
+
+          if (parentPos!=0){
+            std::cout << "prevParent: " << --parentPos << "\n";
+            node prevParent = this->read_node(grandpa.children[parentPos]);
+            int posPrev=0;
+            for (; prevParent.children[posPrev]!=0; ++posPrev);
+            node prevChild = this->read_node(prevParent.children[--posPrev]);
+            prevChild.next = left.page_id;
+            write_node(prevChild.page_id, prevChild); 
+          }
+        }
+      }
+      else{
+        node prevChild = this->read_node(parent.children[pos-1]);
+        prevChild.next = left.page_id;
+        write_node(prevChild.page_id, prevChild);
+      }
+    }
 
     write_node(parent.page_id, parent);
     write_node(left.page_id, left);
@@ -177,6 +211,12 @@ public:
     }
     right.children[i] = ptr.children[iter];
 
+    ptr.next = 0;
+    if (ptr.children[0]==0){ // ptr (root) is leaf
+      left.next = right.page_id;
+      right.next = ptr.children[pos + 2];
+    }
+
     ptr.children[pos] = left.page_id;
     ptr.keys[0] = ptr.keys[BTREE_ORDER / 2]; // store key, not data
     ptr.children[pos + 1] = right.page_id;
@@ -206,7 +246,9 @@ public:
       for (int k = 0; k < level; k++) {
         std::cout << "    ";
       }
-      std::cout << (char)ptr.data[i] << ptr.keys[i] << "\n";
+      std::cout << (char)ptr.data[i] << ptr.page_id;
+      if (ptr.next) std::cout << "^" << ptr.next;
+      std::cout << std::endl;
     }
     if (ptr.children[i + 1]) {
       node child = read_node(ptr.children[i + 1]);

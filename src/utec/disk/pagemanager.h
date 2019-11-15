@@ -1,4 +1,4 @@
-#pragma once
+#pragma once 
 
 #include <cstdlib>
 #include <fstream>
@@ -10,7 +10,7 @@ namespace disk {
 
 class pagemanager : protected std::fstream {
 public:
-  pagemanager(std::string file_name, int page_size);
+  pagemanager(std::string file_name, int page_size, bool trunc=false);
 
   ~pagemanager();
 
@@ -41,7 +41,7 @@ public:
 
   // Marca el registro como borrado:
 
-  template <class Register> void erase(const long &n) {
+  template <class Register> void erase(const long &n, Register &reg) {
     char mark;
     clear();
     mark = 'N';

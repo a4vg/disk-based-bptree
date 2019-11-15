@@ -9,7 +9,7 @@
 namespace utec {
 namespace disk {
 
-pagemanager::pagemanager(std::string file_name, int page_size)
+pagemanager::pagemanager(std::string file_name, int page_size, bool trunc)
     : std::fstream(file_name.data(),
                    std::ios::in | std::ios::out | std::ios::binary) {
   pageSize = page_size;
@@ -17,8 +17,8 @@ pagemanager::pagemanager(std::string file_name, int page_size)
   fileName = file_name;
   if (!good()) {
     empty = true;
-    open(file_name.data(),
-         std::ios::in | std::ios::out | std::ios::trunc | std::ios::binary);
+    if (trunc) open(file_name.data(), std::ios::in | std::ios::out | std::ios::trunc | std::ios::binary);
+    else open(file_name.data(), std::ios::in | std::ios::out | std::ios::app | std::ios::binary);
   }
 }
 

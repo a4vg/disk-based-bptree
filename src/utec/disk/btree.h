@@ -111,13 +111,15 @@ private:
 
 public:
   btree(std::shared_ptr<pagemanager> pm) : pm{pm} {
-
-    node root{header.root_id};
-    pm->save(root.page_id, root);
-
-    header.count++;
-
-    pm->save(0, header);
+    if (pm->is_empty()){
+      node root{header.root_id};
+      pm->save(root.page_id, root);
+      header.count++;
+      pm->save(0, header);
+    }
+    else{
+      pm->recover(0, header);
+    }
   }
 
   node new_node() {
@@ -226,6 +228,7 @@ public:
       }
     }
 
+    pm->erase(ptr.page_id, ptr);
     write_node(parent.page_id, parent);
     write_node(left.page_id, left);
     write_node(right.page_id, right);

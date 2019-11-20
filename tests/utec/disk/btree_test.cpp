@@ -9,19 +9,7 @@
 
 #include <fmt/core.h>
 
-// PAGE_SIZE 64 bytes
-#define PAGE_SIZE  64
-
-// Other examples:
-// PAGE_SIZE 1024 bytes => 1Kb
-// PAGE_SIZE 1024*1024 bytes => 1Mb
-
-// PAGE_SIZE = 2 * sizeof(long) +  (BTREE_ORDER + 1) * sizeof(int) + (BTREE_ORDER + 2) * sizeof(long)  
-// PAGE_SIZE = 2 * sizeof(long) +  (BTREE_ORDER) * sizeof(int) + sizeof(int) + (BTREE_ORDER) * sizeof(long) + 2 * sizeof(long)
-// PAGE_SIZE = (BTREE_ORDER) * (sizeof(int) + sizeof(long))  + 2 * sizeof(long) + sizeof(int) +  2 * sizeof(long)
-//  BTREE_ORDER = PAGE_SIZE - (2 * sizeof(long) + sizeof(int) +  2 * sizeof(long)) /  (sizeof(int) + sizeof(long))
-
-#define BTREE_ORDER   ((PAGE_SIZE - (2 * sizeof(long) + sizeof(int) +  2 * sizeof(long)) ) /  (sizeof(int) + sizeof(long)))
+#define GETORDER(p, d) ((p - (7 * sizeof(long) + d) ) /  (d + sizeof(long)))
 
 using namespace utec::disk;
     
@@ -48,14 +36,19 @@ struct Student {
 };
 
 void index_records_using_btree_only_one_time () {
-  bool trunc_file = true;
+  // Define constants
   const int page_size = 1024;
-  const int btree_order = 82;
-  std::shared_ptr<pagemanager> pm = std::make_shared<pagemanager>("btree.index", page_size, trunc_file);
+  const int btree_order = GETORDER(page_size, sizeof(char));
+
+  std::cout << "PAGE_SIZE: " << page_size << std::endl;
+  std::cout << "BTREE_ORDER: " << btree_order << std::endl;
+
+  // Create tree
+  std::shared_ptr<pagemanager> pm = std::make_shared<pagemanager>("btree.index", page_size, true); // trunc file = true
   btree< long, btree_order> bt(pm);
   
-  pagemanager record_manager ("students.bin", page_size, trunc_file);
-
+  // Create students from file and insert into btree
+  pagemanager record_manager ("students.bin", page_size, true); // trunc file = true
   std::ifstream data("students-shuffled.csv");
   long id;
   bool passed;
@@ -70,62 +63,85 @@ void index_records_using_btree_only_one_time () {
   }
 }
 
-// select * from Student where 50 <= id and id <= 100 
-void select(){
+// select * from Student where x <= id and id < y
+void select(long x, long y){
+  // Define constants
   const int page_size = 1024;
-  const int btree_order = 82;
-  pagemanager record_manager ("students.bin", page_size);
+  const int btree_order = GETORDER(page_size, sizeof(char));
 
-  std::shared_ptr<pagemanager> pm = std::make_shared<pagemanager>("btree.index", page_size);
+  // Recover tree
+  std::shared_ptr<pagemanager> pm = std::make_shared<pagemanager>("btree.index", page_size); // trunc file = false
   btree< long, btree_order> bt(pm);
 
-  auto iter = bt.range_search(3, 100); // range_search(x, y) = [x, y>
-  while (iter != iter.limit()){
+  // Recover students binary data file
+  pagemanager record_manager ("students.bin", page_size); // trunc file = false
+
+  // Select students
+  auto iter = bt.range_search(x, y); // [x, y>
+  for (; iter != iter.limit(); iter++){
     Student s;
     record_manager.recover(*iter, s);
     std::cout << s.id << " " << s.passed << " " << s.name << " " << s.surname << " " << s.n_credits << std::endl;
-    iter++;
   }
 }
 
 TEST_F(DiskBasedBtree, IndexingRandomElements) {
-  bool trunc_file = true;
-  std::shared_ptr<pagemanager> pm = std::make_shared<pagemanager>("btree.index", PAGE_SIZE, trunc_file);
-  std::cout << "PAGE_SIZE: " << PAGE_SIZE << std::endl;
-  std::cout << "BTREE_ORDER: " << BTREE_ORDER << std::endl;
-  btree<char, BTREE_ORDER> bt(pm);
+  // Define constants
+  const int page_size = 64;
+  const int btree_order = 2; // GETORDER(page_size, sizeof(char));
+
+  std::cout << "PAGE_SIZE: " << page_size << std::endl;
+  std::cout << "BTREE_ORDER: " << btree_order << std::endl;
+  
+  // Create tree
+  std::shared_ptr<pagemanager> pm = std::make_shared<pagemanager>("btree.index", page_size, true); // trunc file = true
+  btree<char, btree_order> bt(pm);
+
+  // Insert data into tree
   std::string values = "zxcnmvfjdaqpirue";
   for(auto c : values) {
     bt.insert(c, (long)c);
   }
-  bt.print_tree();
+
   std::ostringstream out;
   bt.print(out);
   std::sort(values.begin(), values.end());
 
+  bt.print_tree();
   EXPECT_EQ(out.str(), values.c_str());
 }
  
 
 TEST_F(DiskBasedBtree, Persistence) {
-  std::shared_ptr<pagemanager> pm = std::make_shared<pagemanager>("btree.index", PAGE_SIZE);
-  btree<char, BTREE_ORDER> bt(pm);
+  // Define constants
+  const int page_size = 64;
+  const int btree_order = 2; // GETORDER(page_size, sizeof(char));
+
+  std::cout << "PAGE_SIZE: " << page_size << std::endl;
+  std::cout << "BTREE_ORDER: " << btree_order << std::endl;
+
+  // Create tree
+  std::shared_ptr<pagemanager> pm = std::make_shared<pagemanager>("btree.index", page_size); // trunc file = false
+  btree<char, btree_order> bt(pm);
+  
+  // Insert data into tree
   std::string values = "123456";
   for(auto c : values) {
     bt.insert(c, (long)c);
   }
-  bt.print_tree();
 
   std::ostringstream out;
   bt.print(out);
   std::string all_values = "zxcnmvfjdaqpirue123456";
   std::sort(all_values.begin(), all_values.end());
+
+  bt.print_tree();
   EXPECT_EQ(out.str(), all_values.c_str());
 }
 
 TEST_F(DiskBasedBtree, Dictionary) {
   index_records_using_btree_only_one_time();
-  select();
+  select(55, 101); // [55, 100>
 }
 
 

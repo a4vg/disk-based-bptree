@@ -17,6 +17,7 @@ struct Node {
     T data[BTREE_ORDER + 1];
     long children[BTREE_ORDER + 2];
     long next{0};
+    long prev{0};
 
     Node(long page_id) : page_id{page_id} {
       count = 0;
@@ -146,17 +147,17 @@ public:
     }
   }
 
-  int insert(node &ptr, const T &value, long key, long grandpa_id=0) {
+  int insert(node &ptr, const T &value, long key) {
     int pos = 0;
-    while (pos < ptr.count && ptr.keys[pos] < value) {
+    while (pos < ptr.count && ptr.keys[pos] < key) {
       pos++;
     }
     if (ptr.children[pos] != 0) {
       long page_id = ptr.children[pos];
       node child = read_node(page_id);
-      int state = insert(child, value, key, ptr.page_id);
+      int state = insert(child, value, key);
       if (state == BT_OVERFLOW) {
-        split(ptr, pos, grandpa_id);
+        split(ptr, pos);
       }
     } else { // is leaf
       ptr.insert_in_node(pos, value, key, ptr.children[pos] == 0);
@@ -165,7 +166,7 @@ public:
     return ptr.is_overflow() ? BT_OVERFLOW : NORMAL;
   }
 
-  void split(node &parent, int pos, long grandpa_id=0) {
+  void split(node &parent, int pos) {
     node ptr = this->read_node(parent.children[pos]);
     node left = this->new_node();
     node right = this->new_node();
@@ -198,33 +199,23 @@ public:
     parent.children[pos] = left.page_id;
     parent.children[pos + 1] = right.page_id;
 
-    // TODO: Clean code
     parent.next = 0;
-    if (ptr.children[0]==0){ // link nodes if leaf
+    parent.prev = 0;
+    if (ptr.children[0]==0){
       left.next = right.page_id;
+      left.prev = ptr.prev;
       right.next = ptr.next;
+      right.prev = left.page_id;
 
-      if (pos-1<0){ // prev node has different parent
-        if (grandpa_id!=0){
-          node grandpa = this->read_node(grandpa_id);
-          int parentPos = 0;
-
-          for (; grandpa.children[parentPos]!=parent.page_id; ++parentPos);
-
-          if (parentPos!=0){
-            node prevParent = this->read_node(grandpa.children[--parentPos]);
-            int posPrev=0;
-            for (; prevParent.children[posPrev]!=0; ++posPrev);
-            node prevChild = this->read_node(prevParent.children[--posPrev]);
-            prevChild.next = left.page_id;
-            write_node(prevChild.page_id, prevChild); 
-          }
-        }
+      if (left.prev!=0){
+        node leftprev = this->read_node(left.prev);
+        leftprev.next = left.page_id;
+        write_node(left.prev, leftprev);
       }
-      else{
-        node prevChild = this->read_node(parent.children[pos-1]);
-        prevChild.next = left.page_id;
-        write_node(prevChild.page_id, prevChild);
+      if (right.next!=0){
+        node rightnext = this->read_node(right.next);
+        rightnext.prev = right.page_id;
+        write_node(right.next, rightnext);
       }
     }
 
@@ -265,7 +256,7 @@ public:
     ptr.next = 0;
     if (ptr.children[0]==0){ // ptr (root) is leaf
       left.next = right.page_id;
-      right.next = ptr.children[pos + 2];
+      right.prev = left.page_id;
     }
 
     ptr.children[pos] = left.page_id;

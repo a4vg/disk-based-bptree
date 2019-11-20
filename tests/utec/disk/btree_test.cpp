@@ -35,12 +35,16 @@ struct Student {
   char name[32];
   char surname[32];
   int  n_credits;
-};
 
-struct Pair {
-  long id;
-  long page_id;
-  bool  operator < (Pair& p) const; // compare using only id.
+  Student(){};
+  Student(long _id, bool _passed, std::string s_name, std::string s_sur, int _ncredits)
+  : id(_id), passed(_passed), n_credits(_ncredits){
+    strncpy(name, s_name.c_str(), sizeof(name)-1);
+    name[sizeof(name)-1]=0;
+
+    strncpy(surname, s_sur.c_str(), sizeof(surname)-1);
+    surname[sizeof(surname)-1]=0;
+  }
 };
 
 void index_records_using_btree_only_one_time () {
@@ -51,26 +55,19 @@ void index_records_using_btree_only_one_time () {
   btree< long, btree_order> bt(pm);
   
   pagemanager record_manager ("students.bin", page_size, trunc_file);
-  long page_id;
-  Student p {10, false,"alex","orihuela",150};
-  page_id = 0;
-  record_manager.save(page_id, p);
-  bt.insert(page_id, p.id);
 
-  Student p1 {20, true,"Luis","sanchez",100};
-  page_id = 1;
-  record_manager.save(page_id, p1);
-  bt.insert(page_id, p.id);
+  std::ifstream data("students-shuffled.csv");
+  long id;
+  bool passed;
+  std::string s_name, s_surname;
+  int n_credits;
 
-  Student p2 {30, false,"alvaro","valera",150};
-  page_id = 2;
-  record_manager.save(page_id, p2);
-  bt.insert(page_id, p.id);
-
-  Student p3 {40, true,"javier","Mayori",15};
-  page_id = 3;
-  record_manager.save(page_id, p3);
-  bt.insert(page_id, p.id);
+  while (data >> id >> passed >> s_name >> s_surname >> n_credits){
+    Student p(id, passed, s_name, s_surname, n_credits);
+    long page_id = id;
+    record_manager.save(page_id, p);
+    bt.insert(page_id, p.id);
+  }
 }
 
 // select * from Student where 50 <= id and id <= 100 
@@ -81,14 +78,15 @@ void select(){
 
   std::shared_ptr<pagemanager> pm = std::make_shared<pagemanager>("btree.index", page_size);
   btree< long, btree_order> bt(pm);
-  auto iter = bt.range_search(3, 100);
-  for (; iter != bt.end(); iter++) {
+
+  auto iter = bt.range_search(3, 100); // range_search(x, y) = [x, y>
+  while (iter != iter.limit()){
     Student s;
     record_manager.recover(*iter, s);
     std::cout << s.id << " " << s.passed << " " << s.name << " " << s.surname << " " << s.n_credits << std::endl;
+    iter++;
   }
 }
-// Compare FileScan in student records vs Select using Btree
 
 TEST_F(DiskBasedBtree, IndexingRandomElements) {
   bool trunc_file = true;

@@ -300,8 +300,18 @@ public:
       int i=0;
       for (; i<ptr.count-1 && ptr.keys[i]<key; ++i);
 
+      bool lower;
+      // if (ptr.keys[i]<key) lower = false;
+      // else lower = true;
+      lower = false;
       int page = ptr.page_id;
-      if (ptr.keys[i]!=key) page = ptr.next;
+      if (ptr.keys[i]!=key && !lower){
+        if (i+1<ptr.count-1) ++i;
+        else{
+          page = ptr.next;
+          i=0;
+        }
+      }
 
       return std::make_pair(ptr.keys[i]==key, iterator(pm, page, i));
     }

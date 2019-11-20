@@ -123,34 +123,6 @@ TEST_F(DiskBasedBtree, Persistence) {
   EXPECT_EQ(out.str(), all_values.c_str());
 }
 
-
-TEST_F(DiskBasedBtree, Iterators) {
-  const int page_size = 1024;
-  const int btree_order = 82;
-  
-  bool trunc_file = true;
-  std::shared_ptr<pagemanager> pm = std::make_shared<pagemanager>("btree.index", page_size, trunc_file);
-  btree<int, btree_order> bt(pm);
-
-  std::ifstream testFile("1M_numbers.txt");
-  std::string all_letters = "";
-
-  int number;
-  while (testFile >> number){
-    bt.insert(number, number);
-    all_letters+=std::to_string(number);
-  }
-
-  std::ostringstream out;
-  btree<int, btree_order>::iterator iter = bt.find(0).second;
-  for( ; iter != bt.end(); iter++) {
-      out << *iter;
-  }
-  std::sort(all_letters.begin(), all_letters.end());
-  EXPECT_EQ(out.str(), all_letters);
-}
-
-
 TEST_F(DiskBasedBtree, Dictionary) {
   index_records_using_btree_only_one_time();
   select();
